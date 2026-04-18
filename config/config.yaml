@@ -1,0 +1,97 @@
+# paths relative to data directory
+data:
+  raw_path: "reduced_data.csv"
+  processed_path: 'gold/flight_weather.parquet'
+  weather_bronze_data: 'bronze/weather_response.pickle'
+  weather_gold_data: 'gold/weather_data.parquet'
+  flight_weather: 'gold/flight_weather_combined.parquet'
+  flight_weather_categories: 'gold/flight_weather_categories.pickle'
+  start_date: '2015-01-01'
+  end_date: '2015-03-01'
+
+model:
+  type: 'RandomForest'
+  n_trees: 100
+  seed: 42
+
+pipeline:
+  load_columns:
+    - 'YEAR'
+    - 'MONTH'
+    - 'DAY'
+    - 'DAY_OF_WEEK'
+    - 'AIRLINE'
+    - 'FLIGHT_NUMBER'
+    - 'TAIL_NUMBER'
+    - 'ORIGIN_AIRPORT'
+    - 'DESTINATION_AIRPORT'
+    - 'SCHEDULED_DEPARTURE'
+    - 'DEPARTURE_TIME'
+    - 'DEPARTURE_DELAY'
+    - 'SCHEDULED_TIME'
+    - 'ELAPSED_TIME'
+    - 'AIR_TIME'
+    - 'DISTANCE'
+    - 'SCHEDULED_ARRIVAL'
+    - 'ARRIVAL_TIME'
+    - 'ARRIVAL_DELAY'
+    - 'CANCELLED'
+
+  load_flight_gold_columns:
+    - 'MONTH'
+    - 'DAY_OF_WEEK'
+    - 'SCH_DEP_DATE'
+    - 'DAY'
+    - 'SCH_DEP_HOUR'
+    - 'SCH_DEP_MIN'
+    - 'SCH_ARI_DATE'
+    - 'SCH_ARI_DAY'
+    - 'SCH_ARI_HOUR'
+    - 'SCH_ARI_MIN'
+    - 'AIRLINE'
+    - 'FLIGHT_NUMBER'
+    - 'TAIL_NUMBER'
+    - 'ORIGIN_AIRPORT'
+    - 'DESTINATION_AIRPORT'
+    - 'ARRIVAL_DELAY'
+  load_flight_weather_columns_final:
+    - MONTH_SIN
+    - MONTH_COS
+    - DAY_OF_WEEK_SIN
+    - DAY_OF_WEEK_COS
+    - SCH_DEP_DAY_SIN
+    - SCH_DEP_DAY_COS
+    - SCH_DEP_HOUR_SIN
+    - SCH_DEP_HOUR_COS
+    - SCH_DEP_MIN_SIN
+    - SCH_DEP_MIN_COS
+    - SCH_ARI_DAY_SIN
+    - SCH_ARI_DAY_COS
+    - SCH_ARI_HOUR_SIN
+    - SCH_ARI_HOUR_COS
+    - SCH_ARI_MIN_SIN
+    - SCH_ARI_MIN_COS
+    - AIRLINE
+    - FLIGHT_NUMBER
+    - TAIL_NUMBER
+    - ORIGIN_AIRPORT
+    - DESTINATION_AIRPORT
+    - ARRIVAL_DELAY
+    - TEMPERATURE_2M_x
+    - RAIN_x
+    - SNOWFALL_x
+    - CLOUD_COVER_LOW_x
+    - CLOUD_COVER_HIGH_x
+    - WIND_SPEED_10M_x
+    - WIND_SPEED_100M_x
+    - WIND_GUSTS_10M_x
+    - TEMPERATURE_2M_y
+    - RAIN_y
+    - SNOWFALL_y
+    - CLOUD_COVER_LOW_y
+    - CLOUD_COVER_HIGH_y
+    - WIND_SPEED_10M_y
+    - WIND_SPEED_100M_y
+    - WIND_GUSTS_10M_y
+
+

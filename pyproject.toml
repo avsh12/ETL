@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flight_risk"
+version = "0.1"
+description = "ETL and ML pipeline for flight risk prediction"
+readme = "README.md"
+requires-python = ">=3.9"
+
+# ✅ ONLY Third-Party Libraries go here
+dependencies = ["matplotlib", "numpy>=1.24", "pandas>=2.0", "sqlalchemy", "pyyaml", "openmeteo_requests", "requests", "requests_cache", "airports", "pyyaml", "retry_requests"] # Add your libs here
+
+[tool.setuptools.packages.find]
+where = ["src"]  # Tells Python code is inside src
+include = ["*"]
