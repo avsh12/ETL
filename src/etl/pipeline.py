@@ -66,7 +66,7 @@ def weather_etl(
     return weather_data
 
 
-def pipeline(filepath: str | Path | None = None) -> pd.DataFrame:
+def pipeline(filepath: str | Path | None = None) -> list:
     features = """temperature_2m
     rain
     snowfall
@@ -106,7 +106,7 @@ def pipeline(filepath: str | Path | None = None) -> pd.DataFrame:
     target = flight_weather_data["SCH_ARI_DELAY"]
     features = flight_weather_data.drop(columns=["SCH_ARI_DELAY"])
 
-    return features, target, categories
+    return [features, target, categories]
 
 
 # config_path = get_config_resource_path("config")
