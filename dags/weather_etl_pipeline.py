@@ -33,7 +33,7 @@ def weather_etl():
         extra = triggering_asset_events[airport_location_asset][-1].extra
         TIMESTAMP = extra["TIMESTAMP"]
 
-        # remove it
+        # Remove the condition
         resource_exists = Path(stamp(bronze_weather_filepath, TIMESTAMP)).exists()
         log_progress(
             f"Resource status at {stamp(bronze_weather_filepath, TIMESTAMP)}: {Path(stamp(bronze_weather_filepath, TIMESTAMP)).exists()}"

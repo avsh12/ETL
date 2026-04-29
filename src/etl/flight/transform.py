@@ -1,7 +1,15 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from utils.helper import flight_date_range, get_date_range
-from utils.loaders import get_config_resource_path, load_yaml
+
+from etl.flight import clean
+from utils.loaders import (
+    get_config_resource_path,
+    load_parquet,
+    load_yaml,
+    write_parquet,
+)
 from utils.logger import log_progress
 
 """Create features?
@@ -10,7 +18,7 @@ from utils.logger import log_progress
 """
 
 
-def create_new_features(df: pd.DataFrame) -> pd.DataFrame:
+def create_new_features(df: pd.DataFrame, schema: dict) -> pd.DataFrame:
     print("Feature Engineering")
     """
     1. First feature set
@@ -23,9 +31,13 @@ def create_new_features(df: pd.DataFrame) -> pd.DataFrame:
         6. SCH_ARI_MIN
         7. ARI_HOUR
         8. ARI_MIN
-        using the times in the columns SCHEDULED_DEPARTURE, DEPARTURE_TIME, SCHEDULED_ARRIVAL, ARRIVAL_TIME.
+        using the times in the columns 
+        SCHEDULED_DEPARTURE, DEPARTURE_TIME, 
+        SCHEDULED_ARRIVAL, ARRIVAL_TIME.
 
-        The time of departure and arrival are stored as float values in SCHEDULED_DEPARTURE, DEPARTURE_TIME, SCHEDULED_ARRIVAL, ARRIVAL_TIME. The float value is interpreted in four-digit format where the first two digits are for hours and the next two digits for minutes.
+        The time of departure and arrival are stored as float values in 
+        SCHEDULED_DEPARTURE, DEPARTURE_TIME, SCHEDULED_ARRIVAL, ARRIVAL_TIME. 
+        The float value is interpreted in four-digit format where the first two digits are for hours and the next two digits for minutes.
 
     2. Second feature set
         1. Recalculate SCH_ARI_MIN and ARI_MIN using the departure date and time, and the time of travel.
@@ -60,7 +72,7 @@ def create_new_features(df: pd.DataFrame) -> pd.DataFrame:
         + cols[3:-8]
     )
     log_progress(
-        "Created features: SCH_DEP_HOUR, SCH_DEP_MIN, DEP_HOUR, DEP_MIN, SCH_ARI_HOUR, SCH_ARI_MIN, ARI_HOUR, ARI_MIN"
+        "Created features: SCH_DEP_HOUR, SCH_DEP_MIN, DEP_HOUR, DEP_MIN, SCH_ARI_HOUR, SCH_ARI_MIN, ARI_HOUR, ARI_MIN\n"
     )
 
     # Reorder the columns using the rearranged column names.
@@ -72,9 +84,7 @@ def create_new_features(df: pd.DataFrame) -> pd.DataFrame:
         axis=1,
         inplace=True,
     )
-    log_progress(
-        "Features dropped: SCHEDULED_DEPARTURE, DEPARTURE_TIME, SCHEDULED_ARRIVAL, ARRIVAL_TIME"
-    )
+    log_progress("Features dropped: SCHEDULED_DEPARTURE, DEPARTURE_TIME, SCHEDULED_ARRIVAL, ARRIVAL_TIME\n")
 
     # Convert the scheduled departure date and time values to pandas datetime object
     sch_departure_datetime = pd.to_datetime(
@@ -111,29 +121,64 @@ def create_new_features(df: pd.DataFrame) -> pd.DataFrame:
     # Time zone difference needs to be taken into account.
     # Assuming the timezone difference is integral number of hours, we can calculate the ARI_MIN using the departure datetime and the time of travel. We recalculate the feature as there can be errors in the precomputed values.
     df["SCH_ARI_MIN"] = (sch_departure_datetime + sch_time).dt.minute
-    log_progress("SCH_ARI_MIN recalculated")
+    log_progress("SCH_ARI_MIN recalculated using SCH_DEP_DATE and SCHEDULED_TIME")
     df["ARI_MIN"] = (departure_datetime + elapsed_time).dt.minute
-    log_progress("ARI_MIN recalculated")
+    log_progress("ARI_MIN recalculated using DEP_DATE and ELAPSED_TIME\n")
 
     """
     sch_time = pd.to_timedelta(df["SCHEDULED_TIME"], unit="m")
     We have ignored the timezone difference for the present and calculate the scheduled arrival date as sum of sch_departure_datetime and 
     """
     sch_arrival_datetime = sch_departure_datetime + sch_time
-    df.insert(0, "SCH_DEP_DATE", sch_departure_datetime.dt.date.astype("string"))
-    df.insert(1, "SCH_ARI_DATE", sch_arrival_datetime.dt.date.astype("string"))
     df.insert(
-        df.columns.get_loc("SCH_ARI_HOUR"), "SCH_ARI_DAY", sch_arrival_datetime.dt.day
+        loc=0,
+        column="SCH_DEP_DATE",
+        value=sch_departure_datetime.dt.date.astype("string"),
+    )
+    df.insert(
+        loc=1,
+        column="SCH_ARI_DATE",
+        value=sch_arrival_datetime.dt.date.astype("string"),
+    )
+    df.insert(
+        loc=list(df.columns).index("SCH_ARI_HOUR"),
+        column="SCH_ARI_DAY",
+        value=sch_arrival_datetime.dt.day,
     )
 
-    log_progress("Features created: SCH_DEP_DATE, SCH_ARI_DATE, SCH_ARI_HOUR\n")
+    log_progress("Features created: SCH_DEP_DATE, SCH_ARI_DATE, SCH_ARI_DAY\n")
 
-    flight_date_range["start_date"], flight_date_range["end_date"] = get_date_range(df)
+    # flight_date_range["start_date"], flight_date_range["end_date"] = get_date_range(df)
 
-    config_path = get_config_resource_path("config")
-    config = load_yaml(config_path)
-
-    df = df[config["pipeline"]["load_flight_gold_columns"]]
+    log_progress("Renamed DAY to SCH_DEP_DAY\n")
     df = df.rename(columns={"DAY": "SCH_DEP_DAY"})
+    df = df[schema["flight_gold_schema"].keys()].reset_index(drop=True)
+    df = df.astype(schema["flight_gold_schema"])
 
     return df
+
+
+def transform(read_filepath: str | Path, write_filepath: str | Path):
+    schema_path = get_config_resource_path("schema")
+    schema = load_yaml(schema_path)
+
+    df = load_parquet(read_filepath)
+
+    df = (
+        df.pipe(clean.drop_null, schema["flight_not_nullable_features"])
+        .pipe(create_new_features, schema)
+        .pipe(clean.drop_null)
+    )
+
+    write_parquet(df, write_filepath)
+
+    return write_filepath
+
+
+# from datetime import datetime
+
+# flight_transform(
+#     read_filepath=PROJECT_ROOT / "data/flight/silver/flights.parquet",
+#     write_filepath=PROJECT_ROOT
+#     / f"data/flight/gold/flights_{str(datetime.today().date())}.parquet",
+# )

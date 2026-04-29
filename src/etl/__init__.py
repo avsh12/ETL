@@ -1,11 +1,10 @@
-from .extract import airports, date_encoding, flight, index_categories, join, scale, weather
+from . import adapters, airport, flight, merge, pipeline, weather
 
 __all__ = [
-    "airports",
+    "adapters",
+    "merge",
+    "airport",
     "flight",
     "weather",
-    "join",
-    "index_categories",
-    "scale",
-    "date_encoding",
+    "pipeline",
 ]

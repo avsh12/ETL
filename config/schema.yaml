@@ -1,56 +1,129 @@
-source_schema:
-    YEAR: 'int64'
-    MONTH: 'int64'
-    DAY: 'int64'
-    DAY_OF_WEEK: 'int64'
-    AIRLINE: 'object'
-    FLIGHT_NUMBER: 'int64'
-    TAIL_NUMBER: 'object'
-    ORIGIN_AIRPORT: 'object'
-    DESTINATION_AIRPORT: 'object'
-    SCHEDULED_DEPARTURE: 'int64'
-    DEPARTURE_TIME: 'float64'
-    DEPARTURE_DELAY: 'float64'
-    TAXI_OUT: 'float64'
-    WHEELS_OFF: 'float64'
-    SCHEDULED_TIME: 'float64'
-    ELAPSED_TIME: 'float64'
-    AIR_TIME: 'float64'
-    DISTANCE: 'int64'
-    WHEELS_ON: 'float64'
-    TAXI_IN: 'float64'
-    SCHEDULED_ARRIVAL: 'int64'
-    ARRIVAL_TIME: 'float64'
-    ARRIVAL_DELAY: 'float64'
-    DIVERTED: 'int64'
-    CANCELLED: 'int64'
-    CANCELLATION_REASON: 'object'
-    AIR_SYSTEM_DELAY: 'float64'
-    SECURITY_DELAY: 'float64'
-    AIRLINE_DELAY: 'float64'
-    LATE_AIRCRAFT_DELAY: 'float64'
-    WEATHER_DELAY: 'float64'
+flight_bronze_schema:
+  YEAR: 'int64'
+  MONTH: 'int64'
+  DAY: 'int64'
+  DAY_OF_WEEK: 'int64'
+  AIRLINE: 'str'
+  FLIGHT_NUMBER: 'int64'
+  TAIL_NUMBER: 'str'
+  ORIGIN_AIRPORT: 'object'
+  DESTINATION_AIRPORT: 'object'
+  SCHEDULED_DEPARTURE: 'int64'
+  DEPARTURE_TIME: 'float64'
+  DEPARTURE_DELAY: 'float64'
+  TAXI_OUT: 'float64'
+  WHEELS_OFF: 'float64'
+  SCHEDULED_TIME: 'float64'
+  ELAPSED_TIME: 'float64'
+  AIR_TIME: 'float64'
+  DISTANCE: 'int64'
+  WHEELS_ON: 'float64'
+  TAXI_IN: 'float64'
+  SCHEDULED_ARRIVAL: 'int64'
+  ARRIVAL_TIME: 'float64'
+  ARRIVAL_DELAY: 'float64'
+  DIVERTED: 'int64'
+  CANCELLED: 'int64'
+  CANCELLATION_REASON: 'str'
+  AIR_SYSTEM_DELAY: 'float64'
+  SECURITY_DELAY: 'float64'
+  AIRLINE_DELAY: 'float64'
+  LATE_AIRCRAFT_DELAY: 'float64'
+  WEATHER_DELAY: 'float64'
 
-bronze_schema:
+flight_not_nullable_features:
+  - YEAR
+  - MONTH
+  - DAY
+  - DAY_OF_WEEK
+  - AIRLINE
+  - FLIGHT_NUMBER
+  - TAIL_NUMBER
+  - ORIGIN_AIRPORT
+  - DESTINATION_AIRPORT
+  - SCHEDULED_DEPARTURE
+  - DEPARTURE_TIME
+  - DEPARTURE_DELAY
+  - SCHEDULED_TIME
+  - ELAPSED_TIME
+  - SCHEDULED_ARRIVAL
+  - ARRIVAL_TIME
+  - ARRIVAL_DELAY
+  - CANCELLED
+
+flight_silver_schema:
   YEAR: 'int16'
-  MONTH: 'int8'
-  DAY: 'int8'
-  AIRLINE: 'string'
-  FLIGHT_NUMBER: 'int16'
-  TAIL_NUMBER: 'string'
-  ORIGIN_AIRPORT: 'string'
-  DESTINATION_AIRPORT: 'string'
+  MONTH: 'int16'
+  DAY: 'int16'
+  DAY_OF_WEEK: 'int16'
+  AIRLINE: 'str'
+  FLIGHT_NUMBER: 'int64'
+  TAIL_NUMBER: 'str'
+  ORIGIN_AIRPORT: 'str'
+  DESTINATION_AIRPORT: 'str'
   SCHEDULED_DEPARTURE: 'float32'
   DEPARTURE_TIME: 'float32'
   DEPARTURE_DELAY: 'float32'
+  TAXI_OUT: 'float32'
+  WHEELS_OFF: 'float32'
   SCHEDULED_TIME: 'float32'
   ELAPSED_TIME: 'float32'
   AIR_TIME: 'float32'
   DISTANCE: 'float32'
+  WHEELS_ON: 'float32'
+  TAXI_IN: 'float32'
   SCHEDULED_ARRIVAL: 'float32'
   ARRIVAL_TIME: 'float32'
   ARRIVAL_DELAY: 'float32'
+  DIVERTED: 'int8'
   CANCELLED: 'int8'
+  CANCELLATION_REASON: 'str'
+  AIR_SYSTEM_DELAY: 'float32'
+  SECURITY_DELAY: 'float32'
+  AIRLINE_DELAY: 'float32'
+  LATE_AIRCRAFT_DELAY: 'float32'
+  WEATHER_DELAY: 'float32'
+
+flight_gold_schema:
+  # Temporal features
+  YEAR: 'int16'
+  MONTH: 'int8'
+  DAY_OF_WEEK: 'int8'
+  SCH_DEP_DATE: 'str'
+  SCH_DEP_DAY: 'int8'
+  SCH_DEP_HOUR: 'int8'
+  SCH_DEP_MIN: 'int8'
+  SCH_ARI_DATE: 'str'
+  SCH_ARI_DAY: 'int8'
+  SCH_ARI_HOUR: 'int8'
+  SCH_ARI_MIN: 'int8'
+  # Aircraft features
+  AIRLINE: 'str'
+  FLIGHT_NUMBER: 'str'
+  TAIL_NUMBER: 'str'
+  # Airport features
+  ORIGIN_AIRPORT: 'str'
+  DESTINATION_AIRPORT: 'str'
+  # Target features
+  ARRIVAL_DELAY: 'float32'
+
+airport_schema:
+
+weather_silver_schema:
+
+merged_gold_schema:
+
+feature_store_schema:
+
+WEATHER_FEATURES:
+  - temperature_2m
+  - rain
+  - snowfall
+  - cloud_cover_low
+  - cloud_cover_high
+  - wind_speed_10m
+  - wind_speed_100m
+  - wind_gusts_10m
 
 model_schema:
   YEAR: 'int16'
