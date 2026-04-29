@@ -1,72 +1,65 @@
-import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.sdk import dag, task, Asset
-from dotenv import load_dotenv
+from airflow.sdk import Asset, Metadata, dag, task
 
-load_dotenv()
-
-TIMESTAMP = str(datetime.today().date())
-
-bronze_weather_path = Path(str(os.getenv("BRONZE_WEATHER_PATH")))
-silver_weather_path = Path(str(os.getenv("SILVER_WEATHER_PATH")))
-airport_locations_path = Path(str(os.getenv("AIRPORT_LOCATIONS_PATH")))
-airport_locations_filename = Path(str(os.getenv("AIRPORT_LOCATIONS_FILENAME")))
-airport_location_for_weather_path = Path(
-    str(os.getenv("AIRPORT_LOCATION_FOR_WEATHER_PATH"))
+from etl.adapters import openmeteo
+from utils.constants import (
+    airport_location_filepath,
+    airport_location_for_weather_filepath,
+    bronze_weather_filepath,
+    silver_weather_filepath,
 )
+from utils.helper import stamp
+from utils.logger import log_progress
 
-bronze_weather_filepath = bronze_weather_path / "weather_" / TIMESTAMP / ".json"
-silver_weather_filepath = (
-    silver_weather_path / "silver_weather_" / TIMESTAMP / ".parquet"
-)
-airport_locations_filepath = airport_locations_path / airport_locations_filename
-airport_location_for_weather_filepath = (
-    airport_location_for_weather_path
-    / "airports_for_weather_details_"
-    / TIMESTAMP
-    / ".json"
-)
-
+airport_location_asset = Asset(str(airport_location_for_weather_filepath))
+weather_asset = Asset(str(silver_weather_filepath))
 
 weather_etl_args = {
     "dag_id": "weather_etl",
     "start_date": datetime(2026, 4, 18),
-    "end_date": datetime(2026, 4, 19),
+    # "end_date": datetime(2026, 4, 19),
     "catchup": True,
-    "schedule": [Asset(str(airport_location_for_weather_filepath))],
+    "schedule": [airport_location_asset],
     "max_active_runs": 1,
 }
 
 
-@task()
-def extract(
-    airport_locations_for_weather_filepath: str | Path,
-    airport_locations_filepath: str | Path,
-    write_filepath: str | Path,
-):
-    return write_filepath
-
-
-@task(outlets=[Asset(str(silver_weather_filepath))])
-def transform(read_filepath: str | Path, write_filepath: str | Path):
-    return write_filepath
-
-
 @dag(**weather_etl_args)
 def weather_etl():
-    extract_task = extract(
-        airport_locations_for_weather_filepath=airport_location_for_weather_filepath,
-        airport_locations_filepath=airport_locations_filepath,
-        write_filepath=bronze_weather_filepath,
-    )
+    @task()
+    def weather_extract(triggering_asset_events):
+        extra = triggering_asset_events[airport_location_asset][-1].extra
+        TIMESTAMP = extra["TIMESTAMP"]
 
-    transform_task = transform(
-        read_filepath=bronze_weather_filepath, write_filepath=silver_weather_filepath
-    )
+        # remove it
+        resource_exists = Path(stamp(bronze_weather_filepath, TIMESTAMP)).exists()
+        log_progress(
+            f"Resource status at {stamp(bronze_weather_filepath, TIMESTAMP)}: {Path(stamp(bronze_weather_filepath, TIMESTAMP)).exists()}"
+        )
+        if not resource_exists:
+            openmeteo.extract(
+                stamp(airport_location_for_weather_filepath, TIMESTAMP),
+                airport_location_filepath,
+                stamp(bronze_weather_filepath, TIMESTAMP),
+            )
 
-    extract_task >> transform_task
+        return TIMESTAMP
+
+    @task(outlets=[weather_asset])
+    def weather_transform(TIMESTAMP: str):
+
+        openmeteo.weather_bin_to_parquet(
+            stamp(bronze_weather_filepath, TIMESTAMP),
+            stamp(silver_weather_filepath, TIMESTAMP),
+            stamp(airport_location_for_weather_filepath, TIMESTAMP),
+        )
+
+        yield Metadata(weather_asset, {"TIMESTAMP": TIMESTAMP})
+
+    TIMESTAMP = weather_extract()  # type:ignore
+    weather_transform(TIMESTAMP=TIMESTAMP)
 
 
 weather_etl_dag = weather_etl()

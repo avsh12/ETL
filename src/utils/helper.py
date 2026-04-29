@@ -1,4 +1,11 @@
+from pathlib import Path
+
 import pandas as pd
+
+
+def stamp(path: str | Path, timestamp: str):
+    path = Path(path)
+    return f"{path.parent/path.stem}_{timestamp}{path.suffix}"
 
 
 def get_num_api_calls(num_days, num_features, num_values):
