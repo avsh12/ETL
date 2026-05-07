@@ -249,3 +249,4 @@ tests/monster.fbs
 tests/weather_api.fbs
 tests/weather_response.bin
 .gitignore
+ignore/

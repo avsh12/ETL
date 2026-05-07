@@ -1,5 +1,6 @@
 import pandas as pd
-from utils.logger import log_progress
+
+from etl.utils.logger import log_progress
 
 
 def schema_validaton(df: pd.DataFrame, schema, discarded_list=None):
@@ -29,8 +30,6 @@ def schema_validaton(df: pd.DataFrame, schema, discarded_list=None):
         discarded_list.append(df[is_bad].copy())
 
     df = df[~is_bad]
-    log_progress(
-        f"Percentage of rows dropped = {100*(len_df - len(df))/len_df:.4f} %\n"
-    )
+    log_progress(f"Percentage of rows dropped = {100*(len_df - len(df))/len_df:.4f} %\n")
 
     return df

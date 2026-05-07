@@ -16,7 +16,7 @@ services:
       retries: 5
     restart: always
 
-  sample_airflow:
+  airflow:
     build: .
     ports:
       - "${AIRFLOW_WEBSERVER_PORT}:8080"
@@ -36,18 +36,18 @@ services:
       # - ./plugins:/opt/airflow/plugins
       - type: bind
         source: ./flight-etl/data
-        target: /app/flight-etl/data
+        target: /app/data
       - type: bind
         read_only: true
         source: ./flight-etl/config
-        target: /app/flight-etl/config
+        target: /etc/etl/config
+      # - type: bind
+      #   read_only: true
+      #   source: ./flight-etl/src/etl
+      #   target: /app/etl
       - type: bind
         read_only: true
-        source: ./flight-etl/src
-        target: /app/flight-etl/src
-      - type: bind
-        read_only: true
-        source: ./airflow-components/dags
+        source: ./airflow/dags
         target: /opt/airflow/dags
     depends_on:
       - postgres

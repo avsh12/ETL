@@ -1,16 +1,15 @@
 from datetime import datetime
 
 from airflow.sdk import Asset, Metadata, dag, task
-
 from etl import flight
 
 # import the static filepaths for the data
-from utils.constants import (
+from etl.utils.constants import (
     bronze_flight_filepath,
     gold_flight_filepath,
     silver_flight_filepath,
 )
-from utils.helper import stamp
+from etl.utils.helper import stamp
 
 # create the asset which the downstream dags would subscribe for scheduling.
 gold_flight_asset = Asset(str(gold_flight_filepath))
@@ -32,7 +31,7 @@ def flight_etl():
         TIMESTAMP = context["ds"]
 
         flight.clean.clean(
-            stamp(bronze_flight_filepath, TIMESTAMP),
+            bronze_flight_filepath,
             stamp(silver_flight_filepath, TIMESTAMP),
         )
 
@@ -48,7 +47,7 @@ def flight_etl():
         yield Metadata(gold_flight_asset, {"TIMESTAMP": TIMESTAMP})
 
     TIMESTAMP = flight_clean()
-    flight_transform(TIMESTAMP)  # type:ignore
+    flight_transform(TIMESTAMP)  # type: ignore
 
 
 flight_etl_dag = flight_etl()

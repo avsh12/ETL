@@ -1,3 +1,3 @@
-from . import date_encoding, index_categories, join, scale
+from . import join, scale
 
-__all__ = ["index_categories", "join", "scale", "date_encoding"]
+__all__ = ["join", "scale"]

@@ -1,8 +1,3 @@
-from . import adapters, airport, flight, merge
+from . import adapters, airport, flight, merge, utils
 
-__all__ = [
-    "adapters",
-    "merge",
-    "airport",
-    "flight",
-]
+__all__ = ["adapters", "merge", "airport", "flight", "utils"]

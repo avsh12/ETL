@@ -2,16 +2,15 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow.sdk import Asset, Metadata, dag, task
-
 from etl.adapters import openmeteo
-from utils.constants import (
+from etl.utils.constants import (
     airport_location_filepath,
     airport_location_for_weather_filepath,
     bronze_weather_filepath,
     silver_weather_filepath,
 )
-from utils.helper import stamp
-from utils.logger import log_progress
+from etl.utils.helper import stamp
+from etl.utils.logger import log_progress
 
 airport_location_asset = Asset(str(airport_location_for_weather_filepath))
 weather_asset = Asset(str(silver_weather_filepath))
@@ -39,7 +38,7 @@ def weather_etl():
             f"Resource status at {stamp(bronze_weather_filepath, TIMESTAMP)}: {Path(stamp(bronze_weather_filepath, TIMESTAMP)).exists()}"
         )
         if not resource_exists:
-            openmeteo.extract(
+            openmeteo.fetch_weather_details(
                 stamp(airport_location_for_weather_filepath, TIMESTAMP),
                 airport_location_filepath,
                 stamp(bronze_weather_filepath, TIMESTAMP),
@@ -50,7 +49,7 @@ def weather_etl():
     @task(outlets=[weather_asset])
     def weather_transform(TIMESTAMP: str):
 
-        openmeteo.weather_bin_to_parquet(
+        openmeteo.parse_flatbuffer_binary_to_parquet(
             stamp(bronze_weather_filepath, TIMESTAMP),
             stamp(silver_weather_filepath, TIMESTAMP),
             stamp(airport_location_for_weather_filepath, TIMESTAMP),
@@ -58,7 +57,7 @@ def weather_etl():
 
         yield Metadata(weather_asset, {"TIMESTAMP": TIMESTAMP})
 
-    TIMESTAMP = weather_extract()  # type:ignore
+    TIMESTAMP = weather_extract()  # type: ignore
     weather_transform(TIMESTAMP=TIMESTAMP)
 
 

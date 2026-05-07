@@ -3,8 +3,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from utils.loaders import get_config_resource_path, load_csv, load_yaml, write_parquet
-from utils.logger import log_progress
+from etl.utils.loaders import (
+    get_config_resource_path,
+    load_csv,
+    load_yaml,
+    write_parquet,
+)
+from etl.utils.logger import log_progress
 
 """
 Cleaning steps:

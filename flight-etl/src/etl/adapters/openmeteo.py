@@ -8,15 +8,10 @@ import openmeteo_requests
 import pandas as pd
 import requests
 from dotenv import load_dotenv
-from openmeteo_sdk.WeatherApiResponse import WeatherApiResponse
-from requests.adapters import HTTPAdapter
-from requests.exceptions import RetryError
-from urllib3.util.retry import Retry
-
 from etl.airport.extract import get_airport_locations
-from utils.constants import WEATHER_URL
-from utils.helper import get_api_calls_per_min
-from utils.loaders import (
+from etl.utils.constants import WEATHER_URL
+from etl.utils.helper import get_api_calls_per_min
+from etl.utils.loaders import (
     get_config_resource_path,
     load_json,
     load_yaml,
@@ -24,7 +19,11 @@ from utils.loaders import (
     write_bin,
     write_parquet,
 )
-from utils.logger import log_progress
+from etl.utils.logger import log_progress
+from openmeteo_sdk.WeatherApiResponse import WeatherApiResponse
+from requests.adapters import HTTPAdapter
+from requests.exceptions import RetryError
+from urllib3.util.retry import Retry
 
 load_dotenv()
 

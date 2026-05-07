@@ -2,15 +2,14 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow.sdk import Asset, dag, task
-
 from etl.merge.join import join_flight_weather
-from utils.constants import (
+from etl.utils.constants import (
     feature_store_filepath,
     gold_flight_filepath,
     gold_merged_filepath,
     silver_weather_filepath,
 )
-from utils.helper import stamp
+from etl.utils.helper import stamp
 
 flight_asset = Asset(str(gold_flight_filepath))
 weather_asset = Asset(str(silver_weather_filepath))

@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 
 from etl.flight import clean
-from utils.loaders import (
+from etl.utils.loaders import (
     get_config_resource_path,
     load_parquet,
     load_yaml,
     write_parquet,
 )
-from utils.logger import log_progress
+from etl.utils.logger import log_progress
 
 """Create features?
 1. Previous_Flight_Delay (How late was the plane coming in?).

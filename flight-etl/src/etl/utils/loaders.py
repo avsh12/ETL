@@ -5,7 +5,7 @@ from typing import cast
 import yaml
 from pandas import DataFrame, read_csv, read_parquet
 
-from utils.constants import CONFIG_DIR
+from etl.utils.constants import CONFIG_DIR
 
 
 def get_config_resource_path(file_name):

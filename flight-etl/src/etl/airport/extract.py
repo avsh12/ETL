@@ -4,8 +4,8 @@ import pandas as pd
 from airports import airport_data
 from pandas import DataFrame, Index
 
-from utils.loaders import load_parquet, write_json, write_parquet
-from utils.logger import log_progress
+from etl.utils.loaders import load_parquet, write_json, write_parquet
+from etl.utils.logger import log_progress
 
 
 def get_date_range(df: pd.DataFrame) -> list:

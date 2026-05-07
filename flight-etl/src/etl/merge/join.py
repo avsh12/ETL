@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from utils.loaders import load_parquet
+from etl.utils.loaders import load_parquet
 
 
 def join(flight: pd.DataFrame, weather: pd.DataFrame) -> pd.DataFrame:

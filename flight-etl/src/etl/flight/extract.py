@@ -1,21 +1,18 @@
 from pathlib import Path
 
 import pandas as pd
-from utils.constants import DATA_DIR, READER_MAP
-from utils.loaders import get_config_resource_path, load_yaml
-from utils.logger import log_progress
+
 from etl.flight.schema_validation import schema_validaton
+from etl.utils.constants import DATA_DIR, READER_MAP
+from etl.utils.loaders import get_config_resource_path, load_yaml
+from etl.utils.logger import log_progress
 
 
-def load_flight_data(
-    filepath: str | Path, columns: list | None = None, dtype=None
-) -> pd.DataFrame:
+def load_flight_data(filepath: str | Path, columns: list | None = None, dtype=None) -> pd.DataFrame:
     ext = Path(filepath).suffix.lower()
 
     if ext not in READER_MAP:
-        raise ValueError(
-            f"Unsupported file type: {ext}. Supported file types: {list(READER_MAP.keys())}"
-        )
+        raise ValueError(f"Unsupported file type: {ext}. Supported file types: {list(READER_MAP.keys())}")
 
     file_reader = getattr(pd, READER_MAP[ext])
 

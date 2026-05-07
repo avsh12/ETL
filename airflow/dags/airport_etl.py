@@ -2,10 +2,12 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow.sdk import Asset, Metadata, dag, task
-
 from etl import airport
-from utils.constants import airport_location_for_weather_filepath, gold_flight_filepath
-from utils.helper import stamp
+from etl.utils.constants import (
+    airport_location_for_weather_filepath,
+    gold_flight_filepath,
+)
+from etl.utils.helper import stamp
 
 # create assets
 gold_flight_asset = Asset(str(gold_flight_filepath))
