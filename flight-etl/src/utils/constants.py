@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 
 DATA_DIR = PROJECT_ROOT / "data"
@@ -17,8 +18,6 @@ READER_MAP = {
 }
 
 WEATHER_URL: str = str(os.getenv("WEATHER_URL"))
-WEATHER_FEATURES: list[str] = os.getenv("WEATHER_FEATURES")
-
 
 # =================== Generate Fight filepaths =================== #
 

@@ -125,6 +125,13 @@ WEATHER_FEATURES:
   - wind_speed_100m
   - wind_gusts_10m
 
+CATEGORICAL_FEATURES:
+  - AIRLINE
+  - FLIGHT_NUMBER
+  - TAIL_NUMBER
+  - ORIGIN_AIRPORT
+  - DESTINATION_AIRPORT
+
 model_schema:
   YEAR: 'int16'
   MONTH: 'int8'

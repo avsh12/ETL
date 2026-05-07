@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16
+    env_file:
+      - airflow.env
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DB}
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${PG_USER}", "-d", "${PG_DB}"]
+      interval: 10s
+      start_period: 5s
+      retries: 5
+    restart: always
+
+  sample_airflow:
+    build: .
+    ports:
+      - "${AIRFLOW_WEBSERVER_PORT}:8080"
+    env_file:
+      - airflow.env
+      - .env
+    environment:
+      # The env vars map directly to the keys in airflow.cfg as AIRFLOW__<SECTION>__<KEY>
+      # AIRFLOW__CORE__DAGS_FOLDER: /app/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: False
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/${PG_DB}
+      AIRFLOW__DATABASE__FERNET_KEY: ${FERNET_KEY}
+    volumes:
+      # - ./dags:/app/dags # /opt/airflow/dags
+      # - ./logs:/opt/airflow/logs
+      # - ./plugins:/opt/airflow/plugins
+      - type: bind
+        source: ./flight-etl/data
+        target: /app/flight-etl/data
+      - type: bind
+        read_only: true
+        source: ./flight-etl/config
+        target: /app/flight-etl/config
+      - type: bind
+        read_only: true
+        source: ./flight-etl/src
+        target: /app/flight-etl/src
+      - type: bind
+        read_only: true
+        source: ./airflow-components/dags
+        target: /opt/airflow/dags
+    depends_on:
+      - postgres
+    restart: always
+
+volumes:
+  postgres-db-volume:

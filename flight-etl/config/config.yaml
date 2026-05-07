@@ -1,13 +1,4 @@
-# paths relative to data directory
-data:
-  raw_path: "reduced_data.csv"
-  processed_path: 'gold/flight_weather.parquet'
-  weather_bronze_data: 'bronze/weather_response.pickle'
-  weather_gold_data: 'gold/weather_data.parquet'
-  flight_weather: 'gold/flight_weather_combined.parquet'
-  flight_weather_categories: 'gold/flight_weather_categories.pickle'
-  start_date: '2015-01-01'
-  end_date: '2015-03-01'
+
 
 model:
   type: 'RandomForest'

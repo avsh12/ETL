@@ -172,6 +172,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+airflow.env
 .env
 .envrc
 .venv
@@ -242,3 +243,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+tests/.cache.sqlite
+tests/git.html
+tests/monster.fbs
+tests/weather_api.fbs
+tests/weather_response.bin
+.gitignore

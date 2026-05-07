@@ -41,16 +41,3 @@ class Settings(BaseSettings):
     TRANSFORMED_FLIGHT_WEATHER_FILEPATH: str
 
     model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
-
-    def __init__(
-        self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any
-    ) -> None:
-        super().__init__(name, bases, dict, **kwds)
-        TIMESTAMP = str(datetime.today().date())
-
-        self.BRONZE_FLIGHT_PATH = (
-            self.BRONZE_FLIGHT_PATH / self.BRONZE_FLIGHT_FILEPATH / TIMESTAMP / ".csv"
-        )
-
-
-settings = Settings()

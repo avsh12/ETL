@@ -5,11 +5,11 @@ import pandas as pd
 from utils.loaders import load_parquet
 
 
-def join(df: pd.DataFrame, weather: pd.DataFrame) -> pd.DataFrame:
+def join(flight: pd.DataFrame, weather: pd.DataFrame) -> pd.DataFrame:
     weather = weather.reset_index()
 
-    df_flight_weather = pd.merge(
-        df,
+    flight_weather = pd.merge(
+        flight,
         weather.rename(
             columns={
                 "DATE": "SCH_DEP_DATE",
@@ -21,8 +21,8 @@ def join(df: pd.DataFrame, weather: pd.DataFrame) -> pd.DataFrame:
         how="left",
     )
 
-    df_flight_weather = pd.merge(
-        df_flight_weather,
+    flight_weather = pd.merge(
+        flight_weather,
         weather.rename(
             columns={
                 "DATE": "SCH_ARI_DATE",
@@ -35,9 +35,9 @@ def join(df: pd.DataFrame, weather: pd.DataFrame) -> pd.DataFrame:
     )
 
     # Drop the date and time columns that are not needed.
-    df_flight_weather.drop(["SCH_DEP_DATE", "SCH_ARI_DATE"], axis=1, inplace=True)
+    flight_weather.drop(["SCH_DEP_DATE", "SCH_ARI_DATE"], axis=1, inplace=True)
 
-    return df_flight_weather
+    return flight_weather
 
 
 def join_flight_weather(flight_filepath: str | Path, weather_filepath: str | Path, write_filepath: str | Path):
