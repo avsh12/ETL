@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from airflow.sdk import Asset, Metadata, dag, task
@@ -10,6 +11,9 @@ from etl.utils.constants import (
     silver_flight_filepath,
 )
 from etl.utils.helper import stamp
+
+logger = logging.getLogger(__name__)
+logger.info("This is a log message")
 
 # create the asset which the downstream dags would subscribe for scheduling.
 gold_flight_asset = Asset(str(gold_flight_filepath))
@@ -46,8 +50,13 @@ def flight_etl():
 
         yield Metadata(gold_flight_asset, {"TIMESTAMP": TIMESTAMP})
 
+    logger.info("::group::Flight cleaning in progress...")
     TIMESTAMP = flight_clean()
+    logger.info("::endgroup::")
+
+    logger.info("::group::Flight transformation in progress...")
     flight_transform(TIMESTAMP)  # type: ignore
+    logger.info("::endgroup::")
 
 
 flight_etl_dag = flight_etl()

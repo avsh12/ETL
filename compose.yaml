@@ -1,57 +1,155 @@
+x-airflow-common:
+  &airflow-common
+  image: flight-etl
+  build: .
+  env_file:
+    - airflow.env
+    - .env
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+    AIRFLOW__CORE__LOAD_EXAMPLES: ${AIRFLOW__CORE__LOAD_EXAMPLES:-'true'}
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-api-server:8080/execution/'
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
+    #AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    # AIRFLOW__SCHEDULER__HEALTH_CHECK_SERVER_PORT: 8974
+    AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
+  volumes:
+    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - type: bind
+      source: ./flight-etl/data
+      target: /app/data
+    - type: bind
+      read_only: true
+      source: ./flight-etl/config
+      target: /etc/etl/config
+    # - type: bind
+    #   read_only: true
+    #   source: ./flight-etl/src/etl
+    #   target: /app/etl
+  depends_on:
+    &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+ 
 services:
   postgres:
     image: postgres:16
     env_file:
       - airflow.env
     environment:
-      POSTGRES_USER: ${PG_USER}
-      POSTGRES_PASSWORD: ${PG_PASSWORD}
-      POSTGRES_DB: ${PG_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${PG_USER}", "-d", "${PG_DB}"]
-      interval: 10s
-      start_period: 5s
-      retries: 5
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 5s
+      retries: 1
+      start_period: 10s
     restart: always
 
-  airflow:
-    build: .
-    ports:
-      - "${AIRFLOW_WEBSERVER_PORT}:8080"
-    env_file:
-      - airflow.env
-      - .env
+  airflow-api-server:
+    <<: *airflow-common
+    entrypoint: ["airflow"]
+    command:  [api-server , --port, "${AIRFLOW_API_SERVER_PORT}"]
     environment:
-      # The env vars map directly to the keys in airflow.cfg as AIRFLOW__<SECTION>__<KEY>
-      # AIRFLOW__CORE__DAGS_FOLDER: /app/dags
-      AIRFLOW__CORE__LOAD_EXAMPLES: False
-      AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/${PG_DB}
-      AIRFLOW__DATABASE__FERNET_KEY: ${FERNET_KEY}
-    volumes:
-      # - ./dags:/app/dags # /opt/airflow/dags
-      # - ./logs:/opt/airflow/logs
-      # - ./plugins:/opt/airflow/plugins
-      - type: bind
-        source: ./flight-etl/data
-        target: /app/data
-      - type: bind
-        read_only: true
-        source: ./flight-etl/config
-        target: /etc/etl/config
-      # - type: bind
-      #   read_only: true
-      #   source: ./flight-etl/src/etl
-      #   target: /app/etl
-      - type: bind
-        read_only: true
-        source: ./airflow/dags
-        target: /opt/airflow/dags
-    depends_on:
-      - postgres
+      <<: *airflow-common-env
+    ports:
+      - "${AIRFLOW_API_SERVER_PORT}:${AIRFLOW_API_SERVER_PORT}"
+      - "8974:8974"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/api/v2/monitor/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
     restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+  
+  airflow-scheduler:
+    <<: *airflow-common
+    entrypoint: [airflow]
+    command: [scheduler]
+    environment:
+      <<: *airflow-common-env
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/api/v2/monitor/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+  
+  airflow-dag-processor:
+    <<: *airflow-common
+    entrypoint: [airflow]
+    command: [dag-processor]
+    environment:
+      <<: *airflow-common-env
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 10s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+  
+  airflow-triggerer:
+    <<: *airflow-common
+    entrypoint: [airflow]
+    command: [triggerer]
+    environment:
+      <<: *airflow-common-env
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 10s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+  
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        airflow db migrate && \
+        airflow users create \
+          --username ${AIRFLOW_USERNAME} \
+          --firstname ${AIRFLOW_FIRSTNAME:-Admin} \
+          --lastname ${AIRFLOW_LASTNAME:-user} \
+          --role Admin \
+          --email ${AIRFLOW_EMAIL} \
+          --password ${AIRFLOW_PASSWORD}||true
+    environment:
+      <<: *airflow-common-env
+    depends_on:
+      <<: *airflow-common-depends-on
 
 volumes:
   postgres-db-volume:

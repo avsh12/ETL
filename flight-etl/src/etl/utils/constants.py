@@ -9,9 +9,11 @@ load_dotenv()
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.resolve()
 
 # DATA_DIR = PROJECT_ROOT / "data"
-DATA_DIR = Path("/app/data")
+# DATA_DIR = Path("/app/data")
+DATA_DIR = Path(str(os.getenv("DATA_DIR")))
 # CONFIG_DIR = PROJECT_ROOT / "config"
-CONFIG_DIR = Path("/etc/etl/config")
+# CONFIG_DIR = Path("/etc/etl/config")
+CONFIG_DIR = Path(str(os.getenv("CONFIG_DIR")))
 READER_MAP = {
     ".csv": "read_csv",
     ".parquet": "read_parquet",
