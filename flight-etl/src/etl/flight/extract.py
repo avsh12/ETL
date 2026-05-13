@@ -1,14 +1,13 @@
-from pathlib import Path
-
 import pandas as pd
+from upath import UPath as Path
 
 from etl.flight.schema_validation import schema_validaton
-from etl.utils.constants import DATA_DIR, READER_MAP
-from etl.utils.loaders import get_config_resource_path, load_yaml
+from etl.utils.constants import CONFIG_FILEPATH, DATA_DIR, READER_MAP, SCHEMA_FILEPATH
+from etl.utils.file_handler import load_yaml
 from etl.utils.logger import log_progress
 
 
-def load_flight_data(filepath: str | Path, columns: list | None = None, dtype=None) -> pd.DataFrame:
+def load_flight_data(filepath: str, columns: list | None = None, dtype=None) -> pd.DataFrame:
     ext = Path(filepath).suffix.lower()
 
     if ext not in READER_MAP:
@@ -33,24 +32,21 @@ def load_flight_data(filepath: str | Path, columns: list | None = None, dtype=No
 
 
 def extract(
-    filepath: str | Path | None = None,
+    filepath: str | None = None,
     schema: dict | None = None,
     columns: list | None = None,
 ):
     log_progress("Extracting data")
 
     if filepath is None:
-        config_path = get_config_resource_path("config")
-        config = load_yaml(config_path)
+        config = load_yaml(CONFIG_FILEPATH)
         filepath = (DATA_DIR / config["data"]["raw_path"]).resolve()
 
     if schema is None:
-        schema_path = get_config_resource_path("schema")
-        schema = load_yaml(schema_path)
+        schema = load_yaml(SCHEMA_FILEPATH)
 
     if columns is None:
-        config_path = get_config_resource_path("config")
-        config = load_yaml(config_path)
+        config = load_yaml(CONFIG_FILEPATH)
         columns = config["pipeline"]["load_columns"]
 
     flight_data = load_flight_data(

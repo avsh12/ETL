@@ -1,31 +1,29 @@
 import logging
-import os
 import time
-from pathlib import Path
 
 import numpy as np
-import openmeteo_requests
 import pandas as pd
 import requests
 from dotenv import load_dotenv
 from etl.airport.extract import get_airport_locations
-from etl.utils.constants import WEATHER_URL
-from etl.utils.helper import get_api_calls_per_min
-from etl.utils.loaders import (
-    get_config_resource_path,
+from etl.utils.constants import SCHEMA_FILEPATH, WEATHER_URL
+from etl.utils.file_handler import (
     load_json,
     load_yaml,
     read_bin,
     write_bin,
     write_parquet,
 )
-from etl.utils.logger import log_progress
+from etl.utils.helper import get_api_calls_per_min
 from openmeteo_sdk.WeatherApiResponse import WeatherApiResponse
 from requests.adapters import HTTPAdapter
 from requests.exceptions import RetryError
+from upath import UPath as Path
 from urllib3.util.retry import Retry
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # open-meteo source: https://github.com/open-meteo/sdk
 
@@ -132,38 +130,41 @@ def request_weather_api(
         "hourly": features,
         "format": "flatbuffers",
     }
-
+    logger.info(f"Sending request to {WEATHER_URL}")
     total_retries = 3
     status_forcelist = [429, 500, 502, 503, 504]
 
     retry_strategy = Retry(total=total_retries, status_forcelist=status_forcelist)
     openmeteo_adapter = HTTPAdapter(max_retries=retry_strategy)
 
+    logger.debug(f"Using the session {requests.Session}")
     with requests.Session() as session:
         session.mount(url, openmeteo_adapter)
         try:
             response = session.post(url=url, data=params, stream=True)
             return response
         except RetryError as e:
-            logging.error(f"Error while connecting to the weather API: {e}")
+            logger.error(f"Error while connecting to the weather API: {e}")
 
 
 # Based on the API rate limit split the num_values of locations into batches.
 def get_num_data_splits(start_date: str, end_date: str, num_features: int, num_values: int) -> int:
+    logger.debug("Calculating the number of splits required for API call")
     num_days = (pd.to_datetime(end_date) - pd.to_datetime(start_date)).days
     api_calls_per_min = get_api_calls_per_min(num_days, num_features, num_values)
 
     num_splits = int(num_values // (api_calls_per_min * 140 / (num_days * num_features)))
 
-    print(f"Total time: {num_splits} min")
+    logger.debug(f"Total time: {num_splits} min")
 
     return num_splits
 
 
 def split_into_batches(data: pd.DataFrame, start_date, end_date, num_features):
+    logger.info("Splitting the data into batches")
     num_values = len(data)
     num_splits = get_num_data_splits(start_date, end_date, num_features, num_values)
-    log_progress(f"Number of batches = {num_splits}")
+    logger.debug(f"Number of batches: {num_splits}")
 
     if num_splits != 0:
         latlong_batches = np.array_split(data.values.T, num_splits, axis=1)
@@ -181,6 +182,7 @@ def batch_request_weather_api(url: str, latlong: pd.DataFrame, features: list, s
         num_features=len(features),
     )
 
+    logger.info("Sending weather request in batches")
     del_t = 0
     responses = []
     for ix, (latitude, longitude) in enumerate(latlong_batches):
@@ -197,12 +199,10 @@ def batch_request_weather_api(url: str, latlong: pd.DataFrame, features: list, s
             del_t = time.time() - start
 
             responses.append(response)
-
         except Exception as e:
-            error = f"Error occured in block {ix}: {e}"
-            logging.error(f" Error occured while executing batch {ix} of airport locations: {error}")
-            print(error)
+            logger.error(f"Error occured while executing batch {ix} of airport locations: {e}")
 
+        logger.debug("Waiting for a moment before sending the next request")
         if (del_t < 60) & (ix < len(latlong_batches) - 1):
             time.sleep(65 - del_t)
 
@@ -210,16 +210,15 @@ def batch_request_weather_api(url: str, latlong: pd.DataFrame, features: list, s
 
 
 def fetch_weather_details(
-    airport_location_for_weather_filepath: str | Path,
-    airport_location_filepath: str | Path,
-    write_filepath: str | Path,
+    airport_location_for_weather_filepath: str,
+    airport_location_filepath: str,
+    write_filepath: str,
 ):
-    schema_path = get_config_resource_path("schema")
-    schema = load_yaml(schema_path)
+    logger.info("Reading the schema for weather features")
+    schema = load_yaml(SCHEMA_FILEPATH)
     weather_features = schema["WEATHER_FEATURES"]
 
     # get the airport details for which the weather details need to be fetched
-    log_progress(f"Reading the airport location file at {airport_location_for_weather_filepath}")
     airports = load_json(airport_location_for_weather_filepath)
     start_date = airports["start_date"]
     end_date = airports["end_date"]
@@ -227,7 +226,6 @@ def fetch_weather_details(
     airports = airports["airports"]
 
     # returns a dataframe object
-    log_progress("Generate dataframe for the airport lcoations to fetch for weather details.")
     airport_locations = get_airport_locations(airports, airport_location_filepath)
 
     responses = batch_request_weather_api(
@@ -239,11 +237,12 @@ def fetch_weather_details(
     )
 
     # merge all the binary responses
+    logger.info("Merging the weather responses into a single binary object")
     content = bytes(b"")
     for res in responses:
         content += res.content
 
-    write_bin(content, write_filepath)
+    write_bin(write_filepath, content)
 
     return write_filepath
 
@@ -260,6 +259,7 @@ def parse_flatbuffer_binary(content: bytes) -> list[WeatherApiResponse]:
     Returns:
         openmeteo_objects (WeatherApiResponse): The structured FlatBuffer objects.
     """
+    logger.info("Parsing binary weather data to openmeteo objects")
     openmeteo_objects = []
 
     metadata_cursor = 0
@@ -269,8 +269,6 @@ def parse_flatbuffer_binary(content: bytes) -> list[WeatherApiResponse]:
     while metadata_cursor < content_size:
         message_size = int.from_bytes(bytes(content[metadata_cursor : metadata_cursor + 4]), byteorder="little")
 
-        print(f"Metadata cursor at {metadata_cursor}", flush=True)
-        print(f"Message size: {message_size}")
         buffer = bytearray(content[message_cursor : message_cursor + message_size])
 
         openmeteo_objects.append(WeatherApiResponse.GetRootAsWeatherApiResponse(buffer, 0))
@@ -284,6 +282,8 @@ def parse_flatbuffer_binary(content: bytes) -> list[WeatherApiResponse]:
 def parse_flatbuffer_objects_to_dataframe(
     responses: list[WeatherApiResponse], airport_locations: pd.DataFrame | pd.Series, features
 ) -> pd.DataFrame:
+    logger.info("Parsing the openmeteo objects to DataFrame")
+    logger.debug(f"Creating pandas multi-index object with {["IATA", "DATE", "HOUR"]} for weather details dataframe")
     # Create pandas DateTimeIndex for the range of date with a time step of 1 hour
     t = pd.date_range(
         start=pd.to_datetime(responses[0].Hourly().Time(), unit="s"),
@@ -318,6 +318,7 @@ def parse_flatbuffer_objects_to_dataframe(
     index = pd.MultiIndex.from_arrays(index.T, names=["IATA", "DATE", "HOUR"])
     # Create DataFrame from the features in the respnses and the multiindex as index of the DataFrame.
 
+    logger.debug("Restructring the weather features into table with features as columns")
     weather_stacked = [
         np.stack(
             [responses[j].Hourly().Variables(i).ValuesAsNumpy() for i in range(len(features))],
@@ -326,6 +327,7 @@ def parse_flatbuffer_objects_to_dataframe(
         for j in range(len(responses))
     ]
 
+    logger.info("Creating the weather DataFrame")
     weather = pd.DataFrame(
         np.concatenate(weather_stacked, axis=0),
         columns=features,
@@ -338,12 +340,11 @@ def parse_flatbuffer_objects_to_dataframe(
 
 
 def parse_flatbuffer_binary_to_parquet(
-    read_filepath: str | Path,
-    write_filepath: str | Path,
-    airport_location_for_weather_filepath: str | Path,
+    read_filepath: str,
+    write_filepath: str,
+    airport_location_for_weather_filepath: str,
 ):
-    schema_path = get_config_resource_path("schema")
-    schema = load_yaml(schema_path)
+    schema = load_yaml(SCHEMA_FILEPATH)
     weather_features = schema["WEATHER_FEATURES"]
 
     responses = read_bin(read_filepath)
@@ -355,4 +356,4 @@ def parse_flatbuffer_binary_to_parquet(
 
     weather_dataframe = parse_flatbuffer_objects_to_dataframe(openmeteo_objects, airport_locations, weather_features)
 
-    write_parquet(weather_dataframe, write_filepath)
+    write_parquet(write_filepath, weather_dataframe)

@@ -1,13 +1,17 @@
-from pathlib import Path
+import logging
 
 import pandas as pd
+from upath import UPath as Path
 
-from etl.utils.loaders import load_parquet
+from etl.utils.file_handler import load_parquet
+
+logger = logging.getLogger(__name__)
 
 
 def join(flight: pd.DataFrame, weather: pd.DataFrame) -> pd.DataFrame:
     weather = weather.reset_index()
 
+    logger.info("Merging the Weather details for the departure airports")
     flight_weather = pd.merge(
         flight,
         weather.rename(
@@ -21,6 +25,7 @@ def join(flight: pd.DataFrame, weather: pd.DataFrame) -> pd.DataFrame:
         how="left",
     )
 
+    logger.info("Merging the weather details for the arrival airports")
     flight_weather = pd.merge(
         flight_weather,
         weather.rename(
@@ -34,13 +39,14 @@ def join(flight: pd.DataFrame, weather: pd.DataFrame) -> pd.DataFrame:
         how="left",
     )
 
+    logger.debug(f"Dropping the date features: {["SCH_DEP_DATE", "SCH_ARI_DATE"]}")
     # Drop the date and time columns that are not needed.
     flight_weather.drop(["SCH_DEP_DATE", "SCH_ARI_DATE"], axis=1, inplace=True)
 
     return flight_weather
 
 
-def join_flight_weather(flight_filepath: str | Path, weather_filepath: str | Path, write_filepath: str | Path):
+def join_flight_weather(flight_filepath: str, weather_filepath: str, write_filepath: str):
     flight_df = load_parquet(flight_filepath)
     weather_df = load_parquet(weather_filepath)
 

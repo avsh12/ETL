@@ -37,8 +37,6 @@ COPY . .
 
 RUN pip install --no-deps -e ./flight-etl
 
-RUN chmod +x ./airflow/airflow.sh
-
 ENTRYPOINT ["/bin/bash", "-c"]
 
 CMD []

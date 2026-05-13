@@ -1,16 +1,18 @@
-from pathlib import Path
+import logging
 
 import numpy as np
 import pandas as pd
+from upath import UPath as Path
 
 from etl.flight import clean
-from etl.utils.loaders import (
-    get_config_resource_path,
+from etl.utils.constants import SCHEMA_FILEPATH
+from etl.utils.file_handler import (
     load_parquet,
     load_yaml,
     write_parquet,
 )
-from etl.utils.logger import log_progress
+
+logger = logging.getLogger(__name__)
 
 """Create features?
 1. Previous_Flight_Delay (How late was the plane coming in?).
@@ -19,7 +21,7 @@ from etl.utils.logger import log_progress
 
 
 def create_new_features(df: pd.DataFrame, schema: dict) -> pd.DataFrame:
-    print("Feature Engineering")
+    logger.info("Feature Engineering in progress...")
     """
     1. First feature set
         The function creates the following features in the dataframe,
@@ -71,8 +73,8 @@ def create_new_features(df: pd.DataFrame, schema: dict) -> pd.DataFrame:
         ]
         + cols[3:-8]
     )
-    log_progress(
-        "Created features: SCH_DEP_HOUR, SCH_DEP_MIN, DEP_HOUR, DEP_MIN, SCH_ARI_HOUR, SCH_ARI_MIN, ARI_HOUR, ARI_MIN\n"
+    logger.debug(
+        "Created features: SCH_DEP_HOUR, SCH_DEP_MIN, DEP_HOUR, DEP_MIN, SCH_ARI_HOUR, SCH_ARI_MIN, ARI_HOUR, ARI_MIN"
     )
 
     # Reorder the columns using the rearranged column names.
@@ -84,7 +86,7 @@ def create_new_features(df: pd.DataFrame, schema: dict) -> pd.DataFrame:
         axis=1,
         inplace=True,
     )
-    log_progress("Features dropped: SCHEDULED_DEPARTURE, DEPARTURE_TIME, SCHEDULED_ARRIVAL, ARRIVAL_TIME\n")
+    logger.debug("Features dropped: SCHEDULED_DEPARTURE, DEPARTURE_TIME, SCHEDULED_ARRIVAL, ARRIVAL_TIME")
 
     # Convert the scheduled departure date and time values to pandas datetime object
     sch_departure_datetime = pd.to_datetime(
@@ -121,9 +123,9 @@ def create_new_features(df: pd.DataFrame, schema: dict) -> pd.DataFrame:
     # Time zone difference needs to be taken into account.
     # Assuming the timezone difference is integral number of hours, we can calculate the ARI_MIN using the departure datetime and the time of travel. We recalculate the feature as there can be errors in the precomputed values.
     df["SCH_ARI_MIN"] = (sch_departure_datetime + sch_time).dt.minute
-    log_progress("SCH_ARI_MIN recalculated using SCH_DEP_DATE and SCHEDULED_TIME")
+    logger.debug("SCH_ARI_MIN recalculated using SCH_DEP_DATE and SCHEDULED_TIME")
     df["ARI_MIN"] = (departure_datetime + elapsed_time).dt.minute
-    log_progress("ARI_MIN recalculated using DEP_DATE and ELAPSED_TIME\n")
+    logger.debug("ARI_MIN recalculated using DEP_DATE and ELAPSED_TIME")
 
     """
     sch_time = pd.to_timedelta(df["SCHEDULED_TIME"], unit="m")
@@ -146,21 +148,22 @@ def create_new_features(df: pd.DataFrame, schema: dict) -> pd.DataFrame:
         value=sch_arrival_datetime.dt.day,
     )
 
-    log_progress("Features created: SCH_DEP_DATE, SCH_ARI_DATE, SCH_ARI_DAY\n")
+    logger.debug("Features created: SCH_DEP_DATE, SCH_ARI_DATE, SCH_ARI_DAY")
 
     # flight_date_range["start_date"], flight_date_range["end_date"] = get_date_range(df)
 
-    log_progress("Renamed DAY to SCH_DEP_DAY\n")
+    logger.debug("Renamed DAY to SCH_DEP_DAY\n")
     df = df.rename(columns={"DAY": "SCH_DEP_DAY"})
     df = df[schema["flight_gold_schema"].keys()].reset_index(drop=True)
     df = df.astype(schema["flight_gold_schema"])
 
+    logger.debug("Features created")
     return df
 
 
-def transform(read_filepath: str | Path, write_filepath: str | Path):
-    schema_path = get_config_resource_path("schema")
-    schema = load_yaml(schema_path)
+def transform(read_filepath: str, write_filepath: str):
+    logger.info(f"Reading schema")
+    schema = load_yaml(SCHEMA_FILEPATH)
 
     df = load_parquet(read_filepath)
 
@@ -170,15 +173,6 @@ def transform(read_filepath: str | Path, write_filepath: str | Path):
         .pipe(clean.drop_null)
     )
 
-    write_parquet(df, write_filepath)
+    write_parquet(write_filepath, df)
 
     return write_filepath
-
-
-# from datetime import datetime
-
-# flight_transform(
-#     read_filepath=PROJECT_ROOT / "data/flight/silver/flights.parquet",
-#     write_filepath=PROJECT_ROOT
-#     / f"data/flight/gold/flights_{str(datetime.today().date())}.parquet",
-# )

@@ -1,5 +1,5 @@
+import logging
 from datetime import datetime
-from pathlib import Path
 
 from airflow.sdk import Asset, Metadata, dag, task
 from etl.adapters import openmeteo
@@ -10,14 +10,16 @@ from etl.utils.constants import (
     silver_weather_filepath,
 )
 from etl.utils.helper import stamp
-from etl.utils.logger import log_progress
+from upath import UPath as Path
+
+logger = logging.getLogger(__name__)
 
 airport_location_asset = Asset(str(airport_location_for_weather_filepath))
 weather_asset = Asset(str(silver_weather_filepath))
 
 weather_etl_args = {
     "dag_id": "weather_etl",
-    "start_date": datetime(2026, 4, 18),
+    "start_date": datetime(2026, 5, 13),
     # "end_date": datetime(2026, 4, 19),
     "catchup": True,
     "schedule": [airport_location_asset],
@@ -33,16 +35,16 @@ def weather_etl():
         TIMESTAMP = extra["TIMESTAMP"]
 
         # Remove the condition
-        resource_exists = Path(stamp(bronze_weather_filepath, TIMESTAMP)).exists()
-        log_progress(
-            f"Resource status at {stamp(bronze_weather_filepath, TIMESTAMP)}: {Path(stamp(bronze_weather_filepath, TIMESTAMP)).exists()}"
+        # resource_exists = Path(stamp(bronze_weather_filepath, TIMESTAMP)).exists()
+        # logger.debug(
+        #     f"Resource status at {stamp(bronze_weather_filepath, TIMESTAMP)}: {Path(stamp(bronze_weather_filepath, TIMESTAMP)).exists()}"
+        # )
+        # if not resource_exists:
+        openmeteo.fetch_weather_details(
+            stamp(airport_location_for_weather_filepath, TIMESTAMP),
+            airport_location_filepath,
+            stamp(bronze_weather_filepath, TIMESTAMP),
         )
-        if not resource_exists:
-            openmeteo.fetch_weather_details(
-                stamp(airport_location_for_weather_filepath, TIMESTAMP),
-                airport_location_filepath,
-                stamp(bronze_weather_filepath, TIMESTAMP),
-            )
 
         return TIMESTAMP
 

@@ -1,5 +1,4 @@
 from datetime import datetime
-from pathlib import Path
 
 from airflow.sdk import Asset, Metadata, dag, task
 from etl import airport
@@ -8,6 +7,7 @@ from etl.utils.constants import (
     gold_flight_filepath,
 )
 from etl.utils.helper import stamp
+from upath import UPath as Path
 
 # create assets
 gold_flight_asset = Asset(str(gold_flight_filepath))
@@ -17,7 +17,7 @@ airport_location_asset = Asset(str(airport_location_for_weather_filepath))
 # After the upstream flight DAG writes the data to final gold storage, this DAG is triggered.
 airport_etl_dag_args = {
     "dag_id": "airport_etl",
-    "start_date": datetime(2026, 4, 26),
+    "start_date": datetime(2026, 5, 13),
     # "end_date": datetime(2026, 4, 30),
     "catchup": True,
     "schedule": [gold_flight_asset],

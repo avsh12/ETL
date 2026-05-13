@@ -1,6 +1,9 @@
-from pathlib import Path
+import logging
 
 import pandas as pd
+from upath import UPath as Path
+
+logger = logging.getLogger(__name__)
 
 
 def stamp(path: str | Path, timestamp: str):
@@ -31,8 +34,8 @@ def get_api_calls_per_min(
     else:
         api_calls_per_min = max_api_calls_per_min
 
-    print(f"API call rate: {api_calls_per_min} /min")
-    print(f"Number of API calls: {num_api_calls_required:.0f}")
+    logger.debug(f"API call rate: {api_calls_per_min} /min")
+    logger.debug(f"Number of API calls: {1+num_api_calls_required:.0f}")
 
     return int(api_calls_per_min)
 

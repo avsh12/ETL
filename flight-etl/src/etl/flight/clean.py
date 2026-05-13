@@ -1,15 +1,16 @@
 import logging
-from pathlib import Path
 
 import pandas as pd
+from upath import UPath as Path
 
-from etl.utils.loaders import (
-    get_config_resource_path,
+from etl.utils.constants import SCHEMA_FILEPATH
+from etl.utils.file_handler import (
     load_csv,
     load_yaml,
     write_parquet,
 )
-from etl.utils.logger import log_progress
+
+logger = logging.getLogger(__name__)
 
 """
 Cleaning steps:
@@ -21,29 +22,29 @@ Cleaning steps:
 
 
 def schema_validaton(df: pd.DataFrame, schema: dict, not_nullable_features, discarded_list=None):
-    log_progress("Schema Validation in progress...\n")
+    logger.info("Schema Validation in progress...\n")
     # The dataframe consists of string and numeric columns.
     # Define the string and numeric columns
     string_columns = []
     numeric_columns = []
     len_df = len(df)
 
-    log_progress("Creating list of numeric and string features.")
+    logger.info("Creating list of numeric and string features to remove entries with inconsistent types.")
     for key in schema:
         if pd.api.types.is_numeric_dtype(pd.api.types.pandas_dtype(schema[key])):
             numeric_columns.append(key)
         else:
             string_columns.append(key)
-    log_progress(f"Numeric columns: {numeric_columns}\n")
-    log_progress(f"String columns: {string_columns}\n")
-    log_progress(f"Not-nullable features: {not_nullable_features}\n")
+    logger.debug(f"Numeric columns: {numeric_columns}\n")
+    logger.debug(f"String columns: {string_columns}\n")
+    logger.debug(f"Not-nullable features: {not_nullable_features}\n")
 
     # Enforce numeric columns to be numeric
     # Enforce string columns to be string
     # select rows with not null values
-    log_progress("Enforcing datatypes on the entries using the silver schema.")
-    log_progress("Fraction of incosistent entries in the columns.")
-    log_progress(f"{'Column':<20}{'%':>7}")
+    logger.info("Enforcing datatypes on the entries using the silver schema.")
+    logger.debug("Fraction of incosistent entries in the columns.")
+    logger.debug(f"{'Column':<20}{'%':>7}")
     is_bad = pd.Series(False, index=df.index)
     for col in df.columns:
         is_numeric = pd.to_numeric(df[col], errors="coerce").notna()
@@ -56,7 +57,7 @@ def schema_validaton(df: pd.DataFrame, schema: dict, not_nullable_features, disc
             # if the column is nullable, keep the rows that were null previously.
             discard &= df[col].notna()
 
-        log_progress(f"{col:<20}{(100*(discard.sum().item())/len_df):>7.4f}")
+        logger.debug(f"{col:<20}{(100*(discard.sum().item())/len_df):>7.4f}")
 
         is_bad |= discard
 
@@ -66,39 +67,39 @@ def schema_validaton(df: pd.DataFrame, schema: dict, not_nullable_features, disc
 
     # filter the rows
     df = df[~is_bad]
-    log_progress(f"Percentage of rows dropped = {100*(len_df - len(df))/len_df:.2f} %")
+    logger.info(f"Percentage of rows with inconsistent data types dropped: {100*(len_df - len(df))/len_df:.2f} %")
 
     df = df.reset_index(drop=True).astype(schema)
-    log_progress("Schema valication done!\n")
+    logger.info("Schema valication done!\n")
     return df
 
 
 # Drop cancelled flights
 def drop_cancelled(df: pd.DataFrame) -> pd.DataFrame:
     len_df = len(df)
-    log_progress("Dropping Cancelled Flights")
+    logger.info("Dropping Cancelled Flights")
     df = df.query("CANCELLED == 0").drop(columns=["CANCELLED"])
     # reset the index column for the new data size
     df = df.reset_index(drop=True)
 
-    log_progress(f"Percentage of cancelled flights = {100*(len_df-len(df))/len_df:.4f} %")
+    logger.info(f"Percentage of cancelled flights = {100*(len_df-len(df))/len_df:.4f} %")
     return df
 
 
 def drop_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     len_df = len(df)
-    log_progress("De-duplicating")
+    logger.info("De-duplicating")
     df = df.drop_duplicates(ignore_index=True)
-    log_progress(f"Percentage of duplicates dropped = {100*(len_df-len(df))/len_df:.4f} %")
+    logger.info(f"Percentage of duplicates dropped = {100*(len_df-len(df))/len_df:.4f} %")
 
     df = df.reset_index(drop=True)
     return df
 
 
 def drop_null(df: pd.DataFrame, not_nullable_features: list | None = None) -> pd.DataFrame:
-    log_progress("Dropping null values")
-    log_progress("Fraction of null entries in non-nullable column.")
-    log_progress(f"{'Column':<20}{'%':>5}")
+    logger.info("Dropping null values")
+    logger.debug("Fraction of null entries in non-nullable column.")
+    logger.debug(f"{'Column':<20}{'%':>5}")
     null_counts = {}
     len_df = len(df)
 
@@ -112,14 +113,20 @@ def drop_null(df: pd.DataFrame, not_nullable_features: list | None = None) -> pd
     for col in not_nullable_features:
         # Count the number of null values for each column
         null_count = (~mask[col]).sum()
-        log_progress(f"{col:<20}{(100*null_count/len_df):>5.4f}")
+        logger.debug(f"{col:<20}{(100*null_count/len_df):>5.4f}")
         null_counts.update({col: null_count})
         # Filter entries with not null values
         filter &= mask[col]
 
     columns_with_null_values = dict((col, null_counts[col]) for col in not_nullable_features if null_counts[col] != 0)
 
-    log_progress(
+    total_null_values_dropped = 0
+    for key in columns_with_null_values:
+        total_null_values_dropped += columns_with_null_values[key]
+    logger.info(
+        f"Fraction of rows with null values in not-nullable features dropped: {100*total_null_values_dropped/len_df:.4f} %"
+    )
+    logger.debug(
         f"""Columns containing null values: \
         {columns_with_null_values}\n"""
         if len(columns_with_null_values) != 0
@@ -130,11 +137,9 @@ def drop_null(df: pd.DataFrame, not_nullable_features: list | None = None) -> pd
     return df[filter]
 
 
-def clean(read_filepath: str | Path, write_filepath: str | Path):
-    schema_path = get_config_resource_path("schema")
-    schema = load_yaml(schema_path)
+def clean(read_filepath: str, write_filepath: str):
+    schema = load_yaml(SCHEMA_FILEPATH)
 
-    log_progress("Reading the raw flight data.\n")
     df = load_csv(
         read_filepath,
         usecols=schema["flight_bronze_schema"].keys(),
@@ -142,7 +147,7 @@ def clean(read_filepath: str | Path, write_filepath: str | Path):
         engine="pyarrow",
     )
 
-    log_progress("Cleaning in progress...\n")
+    logger.info("Flight cleaning in progress...")
     df = schema_validaton(
         df,
         schema=schema["flight_silver_schema"],
@@ -150,8 +155,8 @@ def clean(read_filepath: str | Path, write_filepath: str | Path):
     )
 
     df = df.pipe(drop_null, schema["flight_not_nullable_features"]).pipe(drop_duplicates)
-    log_progress("Cleaning done!\n")
+    logger.info("Flight cleaning done!")
 
-    write_parquet(df, write_filepath)
+    write_parquet(write_filepath, df)
 
     return write_filepath

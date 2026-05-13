@@ -13,14 +13,13 @@ from etl.utils.constants import (
 from etl.utils.helper import stamp
 
 logger = logging.getLogger(__name__)
-logger.info("This is a log message")
 
-# create the asset which the downstream dags would subscribe for scheduling.
+# create the asset that the downstream dags would subscribe for scheduling.
 gold_flight_asset = Asset(str(gold_flight_filepath))
 
 flight_etl_args = {
     "dag_id": "flight_etl",
-    "start_date": datetime(2026, 4, 25),
+    "start_date": datetime(2026, 5, 13),
     # "end_date": datetime(2026, 4, 30),
     "catchup": True,
     "schedule": "@daily",
@@ -50,13 +49,9 @@ def flight_etl():
 
         yield Metadata(gold_flight_asset, {"TIMESTAMP": TIMESTAMP})
 
-    logger.info("::group::Flight cleaning in progress...")
     TIMESTAMP = flight_clean()
-    logger.info("::endgroup::")
 
-    logger.info("::group::Flight transformation in progress...")
     flight_transform(TIMESTAMP)  # type: ignore
-    logger.info("::endgroup::")
 
 
 flight_etl_dag = flight_etl()
