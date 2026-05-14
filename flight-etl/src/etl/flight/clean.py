@@ -3,7 +3,8 @@ import logging
 import pandas as pd
 from upath import UPath as Path
 
-from etl.utils.constants import SCHEMA_FILEPATH
+from etl.core.constants import SCHEMA_FILEPATH
+from etl.core.interfaces import BaseTransform
 from etl.utils.file_handler import (
     load_csv,
     load_yaml,
@@ -137,26 +138,35 @@ def drop_null(df: pd.DataFrame, not_nullable_features: list | None = None) -> pd
     return df[filter]
 
 
-def clean(read_filepath: str, write_filepath: str):
-    schema = load_yaml(SCHEMA_FILEPATH)
+class FlightClean(BaseTransform):
+    def __init__(self, bronze_flight_filepath: str, schema_filepath: str) -> None:
+        super().__init__()
+        self.bronze_flight_filepath = bronze_flight_filepath
+        self.schema_filepath = schema_filepath
 
-    df = load_csv(
-        read_filepath,
-        usecols=schema["flight_bronze_schema"].keys(),
-        dtype=schema["flight_bronze_schema"],
-        engine="pyarrow",
-    )
+    def transform(self):
+        schema = load_yaml(self.schema_filepath)
+        df = load_csv(
+            self.bronze_flight_filepath,
+            usecols=schema["flight_bronze_schema"].keys(),
+            dtype=schema["flight_bronze_schema"],
+            engine="pyarrow",
+        )
 
-    logger.info("Flight cleaning in progress...")
-    df = schema_validaton(
-        df,
-        schema=schema["flight_silver_schema"],
-        not_nullable_features=schema["flight_not_nullable_features"],
-    )
+        logger.info("Flight cleaning in progress...")
+        df = schema_validaton(
+            df,
+            schema=schema["flight_silver_schema"],
+            not_nullable_features=schema["flight_not_nullable_features"],
+        )
 
-    df = df.pipe(drop_null, schema["flight_not_nullable_features"]).pipe(drop_duplicates)
-    logger.info("Flight cleaning done!")
+        df = df.pipe(drop_null, schema["flight_not_nullable_features"]).pipe(drop_duplicates)
+        return df
 
-    write_parquet(write_filepath, df)
+    def load(self, silver_flight_filepath: str, data: pd.DataFrame):
+        write_parquet(silver_flight_filepath, data)
 
-    return write_filepath
+    def execute(self, silver_flight_filepath: str):
+        df = self.transform()
+        self.load(silver_flight_filepath, df)
+        return silver_flight_filepath

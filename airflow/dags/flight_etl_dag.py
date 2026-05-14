@@ -5,7 +5,8 @@ from airflow.sdk import Asset, Metadata, dag, task
 from etl import flight
 
 # import the static filepaths for the data
-from etl.utils.constants import (
+from etl.core.constants import (
+    SCHEMA_FILEPATH,
     bronze_flight_filepath,
     gold_flight_filepath,
     silver_flight_filepath,
@@ -33,24 +34,19 @@ def flight_etl():
     def flight_clean(**context):
         TIMESTAMP = context["ds"]
 
-        flight.clean.clean(
-            bronze_flight_filepath,
-            stamp(silver_flight_filepath, TIMESTAMP),
-        )
+        flight_cleaner = flight.clean.FlightClean(bronze_flight_filepath, SCHEMA_FILEPATH)
+        flight_cleaner.execute(stamp(silver_flight_filepath, TIMESTAMP))
 
         return TIMESTAMP
 
     @task(outlets=[gold_flight_asset])
     def flight_transform(TIMESTAMP: str, **context):
-        flight.transform.transform(
-            stamp(silver_flight_filepath, TIMESTAMP),
-            stamp(gold_flight_filepath, TIMESTAMP),
-        )
+        flight_transformer = flight.transform.FlightTransform(stamp(silver_flight_filepath, TIMESTAMP))
+        flight_transformer.execute(stamp(gold_flight_filepath, TIMESTAMP))
 
         yield Metadata(gold_flight_asset, {"TIMESTAMP": TIMESTAMP})
 
     TIMESTAMP = flight_clean()
-
     flight_transform(TIMESTAMP)  # type: ignore
 
 

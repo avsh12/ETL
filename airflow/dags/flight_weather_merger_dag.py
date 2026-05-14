@@ -1,8 +1,8 @@
 from datetime import datetime
 
 from airflow.sdk import Asset, dag, task
-from etl.merge.join import join_flight_weather
-from etl.utils.constants import (
+from etl import merge
+from etl.core.constants import (
     feature_store_filepath,
     gold_flight_filepath,
     silver_weather_filepath,
@@ -27,19 +27,19 @@ merger_dag_args = {
 @dag(**merger_dag_args)
 def merger_dag():
     @task()
-    def combine(triggering_asset_events):
+    def merger_task(triggering_asset_events):
         extra = triggering_asset_events[weather_asset][-1].extra
         TIMESTAMP = extra["TIMESTAMP"]
 
-        join_flight_weather(
+        flight_weather_merger = merge.transform.FlightWeatherTransform(
             stamp(gold_flight_filepath, TIMESTAMP),
             stamp(silver_weather_filepath, TIMESTAMP),
-            stamp(feature_store_filepath, TIMESTAMP),
         )
+        flight_weather_merger.execute(stamp(feature_store_filepath, TIMESTAMP))
 
         return TIMESTAMP
 
-    TIMESTAMP = combine()  # type: ignore
+    TIMESTAMP = merger_task()  # type: ignore
 
 
 merger_etl_dag = merger_dag()

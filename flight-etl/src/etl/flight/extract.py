@@ -1,10 +1,9 @@
 import pandas as pd
 from upath import UPath as Path
 
-from etl.flight.schema_validation import schema_validaton
-from etl.utils.constants import CONFIG_FILEPATH, DATA_DIR, READER_MAP, SCHEMA_FILEPATH
+from etl.core.constants import CONFIG_FILEPATH, DATA_DIR, READER_MAP, SCHEMA_FILEPATH
+from etl.flight.clean import schema_validaton
 from etl.utils.file_handler import load_yaml
-from etl.utils.logger import log_progress
 
 
 def load_flight_data(filepath: str, columns: list | None = None, dtype=None) -> pd.DataFrame:
@@ -36,7 +35,6 @@ def extract(
     schema: dict | None = None,
     columns: list | None = None,
 ):
-    log_progress("Extracting data")
 
     if filepath is None:
         config = load_yaml(CONFIG_FILEPATH)
@@ -54,8 +52,6 @@ def extract(
         columns=columns,
         dtype=schema["bronze_schema"],
     )
-    log_progress("Data Extraction Done!\n")
-
-    schema_validaton(flight_data, schema["bronze_schema"])
+    # schema_validaton(flight_data, schema["bronze_schema"])
 
     return flight_data

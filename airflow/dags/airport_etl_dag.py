@@ -2,12 +2,11 @@ from datetime import datetime
 
 from airflow.sdk import Asset, Metadata, dag, task
 from etl import airport
-from etl.utils.constants import (
+from etl.core.constants import (
     airport_location_for_weather_filepath,
     gold_flight_filepath,
 )
 from etl.utils.helper import stamp
-from upath import UPath as Path
 
 # create assets
 gold_flight_asset = Asset(str(gold_flight_filepath))
@@ -49,10 +48,8 @@ def airport_etl():
 
         TIMESTAMP = extra["TIMESTAMP"]
 
-        airport.extract.extract(
-            stamp(gold_flight_filepath, TIMESTAMP),
-            stamp(airport_location_for_weather_filepath, TIMESTAMP),
-        )
+        airport_extractor = airport.extract.AirportExtract(stamp(gold_flight_filepath, TIMESTAMP))
+        airport_extractor.execute(stamp(airport_location_for_weather_filepath, TIMESTAMP))
 
         yield Metadata(airport_location_asset, {"TIMESTAMP": TIMESTAMP})
 

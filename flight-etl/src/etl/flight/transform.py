@@ -4,8 +4,9 @@ import numpy as np
 import pandas as pd
 from upath import UPath as Path
 
+from etl.core.constants import SCHEMA_FILEPATH
+from etl.core.interfaces import BaseTransform
 from etl.flight import clean
-from etl.utils.constants import SCHEMA_FILEPATH
 from etl.utils.file_handler import (
     load_parquet,
     load_yaml,
@@ -161,18 +162,30 @@ def create_new_features(df: pd.DataFrame, schema: dict) -> pd.DataFrame:
     return df
 
 
-def transform(read_filepath: str, write_filepath: str):
-    logger.info(f"Reading schema")
-    schema = load_yaml(SCHEMA_FILEPATH)
+class FlightTransform(BaseTransform):
+    def __init__(self, silver_flight_filepath: str, schema_filepath=SCHEMA_FILEPATH) -> None:
+        super().__init__()
+        self.silver_flight_filepath = silver_flight_filepath
+        self.schema_filepath = schema_filepath
 
-    df = load_parquet(read_filepath)
+    def transform(self):
+        logger.info("Reading schema")
+        schema = load_yaml(self.schema_filepath)
 
-    df = (
-        df.pipe(clean.drop_null, schema["flight_not_nullable_features"])
-        .pipe(create_new_features, schema)
-        .pipe(clean.drop_null)
-    )
+        df = load_parquet(self.silver_flight_filepath)
 
-    write_parquet(write_filepath, df)
+        df = (
+            df.pipe(clean.drop_null, schema["flight_not_nullable_features"])
+            .pipe(create_new_features, schema)
+            .pipe(clean.drop_null)
+        )
+        return df
 
-    return write_filepath
+    def load(self, gold_flight_filepath: str, data: pd.DataFrame):
+        write_parquet(gold_flight_filepath, data)
+
+    def execute(self, gold_flight_filepath: str):
+        df = self.transform()
+        self.load(gold_flight_filepath, df)
+
+        return gold_flight_filepath

@@ -1,10 +1,12 @@
+import logging
+
 import pandas as pd
 from airports import airport_data
 from pandas import DataFrame, Index
 from upath import UPath as Path
 
+from etl.core.interfaces import BaseExtract
 from etl.utils.file_handler import load_parquet, write_json, write_parquet
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -79,3 +81,39 @@ def extract(flight_filepath: str, airport_location_for_weather_filepath: str):
         "end_date": end_date,
     }
     write_json(airport_location_for_weather_filepath, airports)
+
+
+class AirportExtract(BaseExtract):
+    def __init__(self, gold_flight_filepath: str) -> None:
+        super().__init__()
+        self.gold_flight_filepath = gold_flight_filepath
+
+    def extract(self):
+        columns = ["ORIGIN_AIRPORT", "DESTINATION_AIRPORT", "SCH_DEP_DATE", "SCH_ARI_DATE"]
+        df = load_parquet(self.gold_flight_filepath, columns=columns)
+
+        logger.info("Fetching date range from the flight data for weather details")
+        start_date, end_date = get_date_range(df)
+        logger.debug(f"The flights are in the range: {{start_date:{start_date}, end_date: {end_date}}}")
+        # increase the end to by one day to account for data on the last date
+        end_date = str((pd.to_datetime(end_date) + pd.Timedelta(1, unit="D")).date())
+        logger.debug(
+            f"Increased the end_date by one day. The date range used: {{start_date:{start_date}, end_date: {end_date}}}"
+        )
+
+        airports = {
+            "airports": get_airports_from_flight_df(df).to_list(),
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+
+        return airports
+
+    def load(self, airport_location_for_weather_filepath: str, data: dict):
+        write_json(airport_location_for_weather_filepath, data)
+
+    def execute(self, airport_location_for_weather_filepath: str):
+        airports = self.extract()
+        self.load(airport_location_for_weather_filepath, airports)
+
+        return airport_location_for_weather_filepath

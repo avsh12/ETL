@@ -3,7 +3,8 @@ import logging
 import pandas as pd
 from upath import UPath as Path
 
-from etl.utils.file_handler import load_parquet
+from etl.core.interfaces import BaseTransform
+from etl.utils.file_handler import load_parquet, write_parquet
 
 logger = logging.getLogger(__name__)
 
@@ -52,3 +53,30 @@ def join_flight_weather(flight_filepath: str, weather_filepath: str, write_filep
 
     flight_weather_df = join(flight_df, weather_df)
     flight_weather_df.to_parquet(write_filepath)
+
+
+class FlightWeatherTransform(BaseTransform):
+    def __init__(
+        self,
+        gold_flight_filepath: str,
+        silver_weather_filepath: str,
+    ) -> None:
+        super().__init__()
+        self.gold_flight_filepath = gold_flight_filepath
+        self.silver_weather_filepath = silver_weather_filepath
+
+    def transform(self):
+        flight_df = load_parquet(self.gold_flight_filepath)
+        weather_df = load_parquet(self.silver_weather_filepath)
+
+        flight_weather_df = join(flight_df, weather_df)
+        return flight_weather_df
+
+    def load(self, feature_store_filepath: str, data: pd.DataFrame):
+        write_parquet(feature_store_filepath, data)
+
+    def execute(self, feature_store_filepath: str):
+        df = self.transform()
+        self.load(feature_store_filepath, df)
+
+        return feature_store_filepath

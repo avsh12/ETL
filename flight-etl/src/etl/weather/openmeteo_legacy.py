@@ -5,8 +5,9 @@ import numpy as np
 import pandas as pd
 import requests
 from dotenv import load_dotenv
+from etl.adapters.adapter import BaseExtract, BaseTransform
 from etl.airport.extract import get_airport_locations
-from etl.utils.constants import SCHEMA_FILEPATH, WEATHER_URL
+from etl.core.constants import SCHEMA_FILEPATH, WEATHER_URL
 from etl.utils.file_handler import (
     load_json,
     load_yaml,
@@ -137,11 +138,11 @@ def request_weather_api(
     retry_strategy = Retry(total=total_retries, status_forcelist=status_forcelist)
     openmeteo_adapter = HTTPAdapter(max_retries=retry_strategy)
 
-    logger.debug(f"Using the session {requests.Session}")
     with requests.Session() as session:
+        logger.debug(f"Using the session {session}")
         session.mount(url, openmeteo_adapter)
         try:
-            response = session.post(url=url, data=params, stream=True)
+            response = session.post(url=WEATHER_URL, data=params, stream=True)
             return response
         except RetryError as e:
             logger.error(f"Error while connecting to the weather API: {e}")
@@ -209,11 +210,7 @@ def batch_request_weather_api(url: str, latlong: pd.DataFrame, features: list, s
     return responses
 
 
-def fetch_weather_details(
-    airport_location_for_weather_filepath: str,
-    airport_location_filepath: str,
-    write_filepath: str,
-):
+def fetch_weather_details(airport_location_for_weather_filepath, airport_location_filepath, write_filepath):
     logger.info("Reading the schema for weather features")
     schema = load_yaml(SCHEMA_FILEPATH)
     weather_features = schema["WEATHER_FEATURES"]
@@ -242,7 +239,7 @@ def fetch_weather_details(
     for res in responses:
         content += res.content
 
-    write_bin(write_filepath, content)
+        write_bin(write_filepath, content)
 
     return write_filepath
 
